@@ -138,7 +138,7 @@ def canonical_status(status):
         "not yet recruiting": "NOT_YET_RECRUITING",
         "active": "ACTIVE_NOT_RECRUITING"
     }
-    return mapping.get(s, "UNKNOWN")
+    return mapping.get(s, "COMPLETED")
 
 # -------------------------------
 # OpenAI API for Biomarker Extraction
