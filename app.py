@@ -35,6 +35,98 @@ import openai
 from rapidfuzz import fuzz
 
 # -------------------------------
+# Helper Functions (Define these FIRST)
+# -------------------------------
+def standardize_numeric_filter(filter_str):
+    filter_str = filter_str.lower().strip()
+    if "less than or equal to" in filter_str:
+        match = re.search(r"less than or equal to\s*(\d+)", filter_str)
+        if match:
+            return "<=" + match.group(1)
+    if "greater than or equal to" in filter_str:
+        match = re.search(r"greater than or equal to\s*(\d+)", filter_str)
+        if match:
+            return ">=" + match.group(1)
+    if "less than" in filter_str:
+        match = re.search(r"less than\s*(\d+)", filter_str)
+        if match:
+            return "<" + match.group(1)
+    if "greater than" in filter_str:
+        match = re.search(r"greater than\s*(\d+)", filter_str)
+        if match:
+            return ">" + match.group(1)
+    match = re.match(r"([<>!=]=?|=)\s*(\d+)", filter_str)
+    if match:
+        op, value = match.groups()
+        return op + value
+    return filter_str
+
+def standardize_date_filter(filter_str):
+    filter_str = filter_str.lower().strip()
+    months = {
+        "january": "01", "february": "02", "march": "03", "april": "04",
+        "may": "05", "june": "06", "july": "07", "august": "08",
+        "september": "09", "october": "10", "november": "11", "december": "12"
+    }
+    if "before" in filter_str:
+        match = re.search(r"before\s+([a-zA-Z]+)\s*(\d{4})", filter_str)
+        if match:
+            month_word, year = match.groups()
+            month = months.get(month_word.lower(), "01")
+            return "<" + f"{year}-{month}-01"
+    if "after" in filter_str:
+        match = re.search(r"after\s+([a-zA-Z]+)\s*(\d{4})", filter_str)
+        if match:
+            month_word, year = match.groups()
+            month = months.get(month_word.lower(), "01")
+            return ">" + f"{year}-{month}-01"
+    match = re.match(r"([<>]=?)(\d{4}-\d{2}-\d{2})$", filter_str)
+    if match:
+        op, date_val = match.groups()
+        return op + date_val
+    match = re.match(r"([<>]=?)(\d{4}-\d{2})$", filter_str)
+    if match:
+        op, date_val = match.groups()
+        return op + date_val + "-01"
+    return filter_str
+
+def canonical_country(country):
+    if not country:
+        return country
+    c = country.lower().replace(".", "").replace(" ", "")
+    if c in ["us", "usa", "unitedstates", "america"]:
+        return "United States"
+    return country.title()
+
+def canonical_gender(gender):
+    if not gender:
+        return gender
+    g = gender.lower().strip()
+    if g in ["women", "w", "woman", "female", "f"]:
+        return "FEMALE"
+    elif g in ["men", "m", "man", "male"]:
+        return "MALE"
+    return gender.upper()
+
+def canonical_status(status):
+    if not status:
+        return ""
+    s = status.lower().strip()
+    mapping = {
+        "closed": "COMPLETED",
+        "finished": "COMPLETED",
+        "done": "COMPLETED",
+        "terminated": "COMPLETED",
+        "recruiting": "RECRUITING",
+        "enrolling": "RECRUITING",
+        "open": "RECRUITING",
+        "withdrawn": "WITHDRAWN",
+        "not yet recruiting": "NOT_YET_RECRUITING",
+        "active": "ACTIVE_NOT_RECRUITING"
+    }
+    return mapping.get(s, "UNKNOWN")
+
+# -------------------------------
 # OpenAI API for Biomarker Extraction
 # -------------------------------
 def get_biomarker_response(input_text):
@@ -112,7 +204,7 @@ def get_biomarker_response(input_text):
     return data
 
 # -------------------------------
-# OpenAI Filter Extraction Function (Updated to include sponsor)
+# OpenAI Filter Extraction Function (Including Sponsor)
 # -------------------------------
 def test_extract_filters(text):
     openai.api_key = os.environ.get("OPENAI_API_KEY")
@@ -212,7 +304,7 @@ def extract_criteria(input_text):
     return combined
 
 # -------------------------------
-# Updated Metadata Filtering: Now include sponsor filter (using case-insensitive regex)
+# Updated Metadata Filtering: Now include sponsor filter (using regex for case-insensitive matching)
 # -------------------------------
 def build_metadata_filter(parsed_input):
     filters = []
@@ -385,6 +477,13 @@ def format_results_as_html_table(df):
     return df_html.to_html(escape=False, index=False)
 
 # -------------------------------
+# Initialize ChromaDB using repository root.
+# -------------------------------
+CHROMA_DB_DIR = "."
+client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+collection = client.get_or_create_collection("clinical_trials")
+
+# -------------------------------
 # Streamlit UI
 # -------------------------------
 st.markdown("""
@@ -424,6 +523,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
 
 
