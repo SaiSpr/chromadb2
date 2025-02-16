@@ -168,7 +168,7 @@ def get_biomarker_response(input_text):
         }
     ]
     
-prompt = (
+    prompt = (
     "As an experienced oncologist and intelligent assistant, your task is to extract, process, and structure genomic biomarkers from the clinical trials input. "
     "Even if there are minor spelling errors or ambiguities, infer the correct biomarker names based on your clinical knowledge.\n\n"
     "Use this reference table for lung cancer mutations:\n\n"
@@ -200,7 +200,7 @@ prompt = (
     "Example:\n"
     "Input: 'BRAF mutation and KRAS mutation'\n"
     "Output: { \"inclusion_biomarker\": [[\"BRAF mutation\", \"KRAS mutation\"]], \"exclusion_biomarker\": [] }"
-)
+    )
 
     
     response = openai.ChatCompletion.create(
