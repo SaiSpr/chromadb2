@@ -513,7 +513,7 @@ if st.button("🔍 Extract Biomarkers & Find Trials"):
             formatted_results = format_results_as_table(trial_results, response)
             st.dataframe(formatted_results)
             #html_table = format_results_as_html_table(formatted_results)
-            st.markdown(html_table, unsafe_allow_html=True)
+            #st.markdown(html_table, unsafe_allow_html=True)
         else:
             st.warning("⚠️ No matching trials found!")
     else:
