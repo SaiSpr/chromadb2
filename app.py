@@ -511,7 +511,7 @@ if st.button("🔍 Extract Biomarkers & Find Trials"):
         trial_results = query_chromadb(response)
         if not trial_results.empty:
             formatted_results = format_results_as_table(trial_results, response)
-            #st.dataframe(formatted_results)
+            st.dataframe(formatted_results)
             html_table = format_results_as_html_table(formatted_results)
             st.markdown(html_table, unsafe_allow_html=True)
         else:
