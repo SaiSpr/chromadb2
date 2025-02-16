@@ -10,11 +10,9 @@ st.set_page_config(page_title="🧬 TrialCompass AI", page_icon="🧬", layout="
 st.markdown(
     """
     <style>
-    /* Set main app background to white */
     [data-testid="stAppViewContainer"] {
         background-color: white;
     }
-    /* Set sidebar background to white */
     [data-testid="stSidebar"] {
         background-color: white;
     }
@@ -35,7 +33,15 @@ import openai
 from rapidfuzz import fuzz
 
 # -------------------------------
-# Helper Functions (Define these FIRST)
+# Initialize Embedding Model and ChromaDB Collection (Define these once)
+# -------------------------------
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+CHROMA_DB_DIR = "."  # Use repository root (adjust as needed)
+client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+collection = client.get_or_create_collection("clinical_trials")
+
+# -------------------------------
+# Helper Functions
 # -------------------------------
 def standardize_numeric_filter(filter_str):
     filter_str = filter_str.lower().strip()
@@ -477,13 +483,6 @@ def format_results_as_html_table(df):
     return df_html.to_html(escape=False, index=False)
 
 # -------------------------------
-# Initialize ChromaDB using repository root.
-# -------------------------------
-CHROMA_DB_DIR = "."
-client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
-collection = client.get_or_create_collection("clinical_trials")
-
-# -------------------------------
 # Streamlit UI
 # -------------------------------
 st.markdown("""
@@ -523,6 +522,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
 
 
