@@ -10,9 +10,11 @@ st.set_page_config(page_title="🧬 TrialCompass AI", page_icon="🧬", layout="
 st.markdown(
     """
     <style>
+    /* Set main app background to white */
     [data-testid="stAppViewContainer"] {
         background-color: white;
     }
+    /* Set sidebar background to white */
     [data-testid="stSidebar"] {
         background-color: white;
     }
@@ -41,7 +43,7 @@ client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
 collection = client.get_or_create_collection("clinical_trials")
 
 # -------------------------------
-# Helper Functions
+# Helper Functions (Define these FIRST)
 # -------------------------------
 def standardize_numeric_filter(filter_str):
     filter_str = filter_str.lower().strip()
@@ -310,7 +312,8 @@ def extract_criteria(input_text):
     return combined
 
 # -------------------------------
-# Updated Metadata Filtering: Now include sponsor filter (using regex for case-insensitive matching)
+# Updated Metadata Filtering: Now exclude sponsor from metadata filters
+# (We will apply sponsor filtering using fuzzy matching after retrieving results.)
 # -------------------------------
 def build_metadata_filter(parsed_input):
     filters = []
@@ -363,11 +366,6 @@ def build_metadata_filter(parsed_input):
                 filters.append({"startDateEpoch": {op: epoch_val}})
             except Exception:
                 pass
-    # New: add sponsor filtering if provided (using regex for case-insensitive matching)
-    if parsed_input.get("sponsor"):
-        sponsor_val = parsed_input["sponsor"].strip()
-        if sponsor_val:
-            filters.append({"sponsor": {"$regex": sponsor_val, "$options": "i"}})
     if not filters:
         return None
     elif len(filters) == 1:
@@ -376,9 +374,9 @@ def build_metadata_filter(parsed_input):
         return {"$and": filters}
 
 # -------------------------------
-# Post-filtering Function for Eligibility using Combined Substring and Fuzzy Matching
+# Post-filtering Function for Eligibility using Combined Substring and Fuzzy Matching (and Sponsor Fuzzy Filtering)
 # -------------------------------
-def filter_trials_by_eligibility(df, inclusion_keywords, exclusion_keywords, threshold=50):
+def filter_trials_by_eligibility(df, inclusion_keywords, exclusion_keywords, sponsor_filter, threshold=50, sponsor_threshold=60):
     def row_matches(row):
         text = row.get("eligibility", "").lower()
         # Inclusion: require at least one inclusion group to match.
@@ -411,12 +409,17 @@ def filter_trials_by_eligibility(df, inclusion_keywords, exclusion_keywords, thr
                     score = fuzz.token_set_ratio(k, text)
                     if score >= threshold:
                         return False
+        # Sponsor filtering using fuzzy matching (if sponsor_filter provided)
+        if sponsor_filter:
+            sponsor_text = row.get("sponsor", "").lower()
+            if fuzz.token_set_ratio(sponsor_filter.lower(), sponsor_text) < sponsor_threshold:
+                return False
         return True
 
     return df[df.apply(row_matches, axis=1)]
 
 # -------------------------------
-# Updated Query ChromaDB Function (Using Demographic Filtering and Post-filtering by Eligibility)
+# Updated Query ChromaDB Function (Using Demographic Filtering and Post-filtering by Eligibility + Sponsor Fuzzy)
 # -------------------------------
 def query_chromadb(parsed_input):
     demo_filter = build_metadata_filter(parsed_input)
@@ -441,7 +444,8 @@ def query_chromadb(parsed_input):
         df = pd.DataFrame(results["metadatas"][0])
         inclusion_groups = parsed_input.get("inclusion_biomarker", [])
         exclusion_list = [keyword for group in parsed_input.get("exclusion_biomarker", []) for keyword in group]
-        df = filter_trials_by_eligibility(df, inclusion_groups, exclusion_list, threshold=50)
+        sponsor_filter = parsed_input.get("sponsor", "").strip()
+        df = filter_trials_by_eligibility(df, inclusion_groups, exclusion_list, sponsor_filter, threshold=50, sponsor_threshold=60)
         return df
     else:
         return pd.DataFrame(columns=[
