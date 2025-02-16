@@ -35,99 +35,6 @@ import openai
 from rapidfuzz import fuzz
 
 # -------------------------------
-# Helper Functions
-# -------------------------------
-
-def standardize_numeric_filter(filter_str):
-    filter_str = filter_str.lower().strip()
-    if "less than or equal to" in filter_str:
-        match = re.search(r"less than or equal to\s*(\d+)", filter_str)
-        if match:
-            return "<=" + match.group(1)
-    if "greater than or equal to" in filter_str:
-        match = re.search(r"greater than or equal to\s*(\d+)", filter_str)
-        if match:
-            return ">=" + match.group(1)
-    if "less than" in filter_str:
-        match = re.search(r"less than\s*(\d+)", filter_str)
-        if match:
-            return "<" + match.group(1)
-    if "greater than" in filter_str:
-        match = re.search(r"greater than\s*(\d+)", filter_str)
-        if match:
-            return ">" + match.group(1)
-    match = re.match(r"([<>!=]=?|=)\s*(\d+)", filter_str)
-    if match:
-        op, value = match.groups()
-        return op + value
-    return filter_str
-
-def standardize_date_filter(filter_str):
-    filter_str = filter_str.lower().strip()
-    months = {
-        "january": "01", "february": "02", "march": "03", "april": "04",
-        "may": "05", "june": "06", "july": "07", "august": "08",
-        "september": "09", "october": "10", "november": "11", "december": "12"
-    }
-    if "before" in filter_str:
-        match = re.search(r"before\s+([a-zA-Z]+)\s*(\d{4})", filter_str)
-        if match:
-            month_word, year = match.groups()
-            month = months.get(month_word.lower(), "01")
-            return "<" + f"{year}-{month}-01"
-    if "after" in filter_str:
-        match = re.search(r"after\s+([a-zA-Z]+)\s*(\d{4})", filter_str)
-        if match:
-            month_word, year = match.groups()
-            month = months.get(month_word.lower(), "01")
-            return ">" + f"{year}-{month}-01"
-    match = re.match(r"([<>]=?)(\d{4}-\d{2}-\d{2})$", filter_str)
-    if match:
-        op, date_val = match.groups()
-        return op + date_val
-    match = re.match(r"([<>]=?)(\d{4}-\d{2})$", filter_str)
-    if match:
-        op, date_val = match.groups()
-        return op + date_val + "-01"
-    return filter_str
-
-def canonical_country(country):
-    if not country:
-        return country
-    c = country.lower().replace(".", "").replace(" ", "")
-    if c in ["us", "usa", "unitedstates", "america"]:
-        return "United States"
-    return country.title()
-
-def canonical_gender(gender):
-    if not gender:
-        return gender
-    g = gender.lower().strip()
-    if g in ["women", "w", "woman", "female", "f"]:
-        return "FEMALE"
-    elif g in ["men", "m", "man", "male"]:
-        return "MALE"
-    return gender.upper()
-
-def canonical_status(status):
-    if not status:
-        return ""
-    s = status.lower().strip()
-    mapping = {
-        "closed": "COMPLETED",
-        "finished": "COMPLETED",
-        "done": "COMPLETED",
-        "terminated": "COMPLETED",
-        "recruiting": "RECRUITING",
-        "enrolling": "RECRUITING",
-        "open": "RECRUITING",
-        "withdrawn": "WITHDRAWN",
-        "not yet recruiting": "NOT_YET_RECRUITING",
-        "active": "ACTIVE_NOT_RECRUITING"
-    }
-    return mapping.get(s, "UNKNOWN")
-
-# -------------------------------
 # OpenAI API for Biomarker Extraction
 # -------------------------------
 def get_biomarker_response(input_text):
@@ -205,7 +112,7 @@ def get_biomarker_response(input_text):
     return data
 
 # -------------------------------
-# OpenAI Filter Extraction Function (including sponsor)
+# OpenAI Filter Extraction Function (Updated to include sponsor)
 # -------------------------------
 def test_extract_filters(text):
     openai.api_key = os.environ.get("OPENAI_API_KEY")
@@ -221,7 +128,7 @@ def test_extract_filters(text):
                 "For 'country', return the full country name (e.g., 'United States'). "
                 "For 'city', convert to title case (e.g., 'Chicago'). "
                 "For 'fda_drug', return 'True' if FDA approved, 'False' otherwise. "
-                "For 'sponsor', return the sponsor substring if provided, or an empty string if not. "
+                "For 'sponsor', return the sponsor keyword (if any). "
                 "Return an empty string for missing fields."
             ),
             "parameters": {
@@ -305,20 +212,113 @@ def extract_criteria(input_text):
     return combined
 
 # -------------------------------
-# Initialize ChromaDB using repository root.
+# Updated Metadata Filtering: Now include sponsor filter (using case-insensitive regex)
 # -------------------------------
-CHROMA_DB_DIR = "."
-client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
-collection = client.get_or_create_collection("clinical_trials")
+def build_metadata_filter(parsed_input):
+    filters = []
+    if parsed_input.get("country"):
+        country_val = canonical_country(parsed_input["country"])
+        filters.append({"country": {"$eq": country_val}})
+    if parsed_input.get("city"):
+        city_val = parsed_input["city"].strip()
+        filters.append({"city": {"$eq": city_val}})
+    if parsed_input.get("fda_drug"):
+        fdadrug_val = parsed_input["fda_drug"].lower().strip()
+        if fdadrug_val in ["yes", "true", "1", "fda approved"]:
+            filters.append({"isFdaRegulatedDrug": {"$eq": True}})
+        elif fdadrug_val in ["no", "false", "0"]:
+            filters.append({"isFdaRegulatedDrug": {"$eq": False}})
+    if parsed_input.get("study_size"):
+        operator, value = parse_filter_criteria(parsed_input["study_size"])
+        if operator:
+            filters.append({"count": {operator: value}})
+    if parsed_input.get("ages"):
+        operator, value = parse_filter_criteria(parsed_input["ages"])
+        if operator:
+            filters.append({"minAgeNum": {operator: value}})
+    if parsed_input.get("gender"):
+        gender_val = canonical_gender(parsed_input["gender"])
+        filters.append({"sex": {"$in": ["ALL", gender_val]}})
+    if parsed_input.get("status"):
+        status_val = canonical_status(parsed_input["status"])
+        filters.append({"overallStatus": {"$eq": status_val}})
+    if parsed_input.get("start_date"):
+        start_date_filter_str = parsed_input["start_date"].strip()
+        op = None
+        date_val = ""
+        if start_date_filter_str.startswith("<="):
+            op = "$lte"
+            date_val = start_date_filter_str[2:]
+        elif start_date_filter_str.startswith("<"):
+            op = "$lt"
+            date_val = start_date_filter_str[1:]
+        elif start_date_filter_str.startswith(">="):
+            op = "$gte"
+            date_val = start_date_filter_str[2:]
+        elif start_date_filter_str.startswith(">"):
+            op = "$gt"
+            date_val = start_date_filter_str[1:]
+        if op and date_val:
+            try:
+                dt = datetime.strptime(date_val, "%Y-%m-%d")
+                epoch_val = int(dt.timestamp())
+                filters.append({"startDateEpoch": {op: epoch_val}})
+            except Exception:
+                pass
+    # New: add sponsor filtering if provided (using regex for case-insensitive matching)
+    if parsed_input.get("sponsor"):
+        sponsor_val = parsed_input["sponsor"].strip()
+        if sponsor_val:
+            filters.append({"sponsor": {"$regex": sponsor_val, "$options": "i"}})
+    if not filters:
+        return None
+    elif len(filters) == 1:
+        return filters[0]
+    else:
+        return {"$and": filters}
 
 # -------------------------------
-# Load Embedding Model (for query)
+# Post-filtering Function for Eligibility using Combined Substring and Fuzzy Matching
 # -------------------------------
-device = "cuda" if torch.cuda.is_available() else "cpu"
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+def filter_trials_by_eligibility(df, inclusion_keywords, exclusion_keywords, threshold=50):
+    def row_matches(row):
+        text = row.get("eligibility", "").lower()
+        # Inclusion: require at least one inclusion group to match.
+        if inclusion_keywords:
+            group_match = False
+            for group in inclusion_keywords:
+                if group:
+                    all_match = True
+                    for keyword in group:
+                        k = keyword.lower().strip()
+                        if k in text:
+                            score = 100
+                        else:
+                            score = fuzz.token_set_ratio(k, text)
+                        if score < threshold:
+                            all_match = False
+                            break
+                    if all_match:
+                        group_match = True
+                        break
+            if not group_match:
+                return False
+        # Exclusion: if any exclusion keyword is matched (directly or via fuzzy) above threshold, reject.
+        if exclusion_keywords:
+            for keyword in exclusion_keywords:
+                k = keyword.lower().strip()
+                if k in text:
+                    return False
+                else:
+                    score = fuzz.token_set_ratio(k, text)
+                    if score >= threshold:
+                        return False
+        return True
+
+    return df[df.apply(row_matches, axis=1)]
 
 # -------------------------------
-# Query ChromaDB Function (with post-filtering by sponsor)
+# Updated Query ChromaDB Function (Using Demographic Filtering and Post-filtering by Eligibility)
 # -------------------------------
 def query_chromadb(parsed_input):
     demo_filter = build_metadata_filter(parsed_input)
@@ -331,6 +331,7 @@ def query_chromadb(parsed_input):
     City: {parsed_input.get('city', '')}
     FDA Regulated Drug: {parsed_input.get('fda_drug', '')}
     Start Date: {parsed_input.get('start_date', '')}
+    Sponsor: {parsed_input.get('sponsor', '')}
     """
     query_embedding = embedding_model.encode(query_text, convert_to_tensor=False)
     results = collection.query(
@@ -343,10 +344,6 @@ def query_chromadb(parsed_input):
         inclusion_groups = parsed_input.get("inclusion_biomarker", [])
         exclusion_list = [keyword for group in parsed_input.get("exclusion_biomarker", []) for keyword in group]
         df = filter_trials_by_eligibility(df, inclusion_groups, exclusion_list, threshold=50)
-        # Post-filter by sponsor if provided in filter criteria
-        sponsor_filter = parsed_input.get("sponsor", "").strip()
-        if sponsor_filter:
-            df = df[df["sponsor"].str.contains(sponsor_filter, case=False, na=False)]
         return df
     else:
         return pd.DataFrame(columns=[
@@ -370,7 +367,7 @@ def format_results_as_table(df, extracted_data):
             row.get("startDate", ""),
             row.get("country", ""),
             row.get("city", ""),
-            row.get("sponsor", ""),          # Sponsor column appears here (before FDA Regulated Drug)
+            row.get("sponsor", ""),         # Sponsor column printed here (after City)
             row.get("isFdaRegulatedDrug", "")
         ])
     return pd.DataFrame(
@@ -400,7 +397,7 @@ st.markdown("### 🩸 Enter Biomarker & Eligibility Criteria:")
 
 user_input = st.text_area(
     "Provide key biomarkers and eligibility criteria to find relevant trials below 👇", 
-    placeholder="e.g., 'List lung cancer trials for KRAS mutation patients sponsored by University of Virginia, female in the US, in Boston, that require FDA approved drug and have a study size > 35 and before June 2020'"
+    placeholder="e.g., 'List lung cancer trials for KRAS mutation patients, female in the US, in Boston, that require FDA approved drug, University of Virginia'"
 )
 
 if st.button("🔍 Extract Biomarkers & Find Trials"):
