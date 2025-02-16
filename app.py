@@ -460,7 +460,7 @@ def query_chromadb(parsed_input):
     query_embedding = embedding_model.encode(query_text, convert_to_tensor=False)
     results = collection.query(
         query_embeddings=[query_embedding.tolist()],
-        n_results=5000,
+        n_results=6000,
         where=demo_filter
     )
     if results and "metadatas" in results and results["metadatas"]:
