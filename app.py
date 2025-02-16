@@ -376,7 +376,7 @@ def build_metadata_filter(parsed_input):
 # -------------------------------
 # Post-filtering Function for Eligibility using Combined Substring and Fuzzy Matching (and Sponsor Fuzzy Filtering)
 # -------------------------------
-def filter_trials_by_eligibility(df, inclusion_keywords, exclusion_keywords, sponsor_filter, threshold=50, sponsor_threshold=60):
+def filter_trials_by_eligibility(df, inclusion_keywords, exclusion_keywords, sponsor_filter, threshold=50, sponsor_threshold=40):
     def row_matches(row):
         text = row.get("eligibility", "").lower()
         # Inclusion: require at least one inclusion group to match.
