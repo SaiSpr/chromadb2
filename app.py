@@ -127,7 +127,7 @@ def canonical_status(status):
         return ""
     s = status.lower().strip()
     mapping = {
-        "completed": "COMPLETED"
+        "completed": "COMPLETED",
         "closed": "COMPLETED",
         "finished": "COMPLETED",
         "done": "COMPLETED",
