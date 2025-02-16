@@ -67,6 +67,14 @@ def standardize_numeric_filter(filter_str):
         return op + value
     return filter_str
 
+def parse_filter_criteria(filter_value):
+    match = re.match(r"([<>!=]=?|=)\s*(\d+)", str(filter_value))
+    if match:
+        operator_map = {">": "$gt", ">=": "$gte", "<": "$lt", "<=": "$lte", "=": "$eq", "!=": "$ne"}
+        op, value = match.groups()
+        return operator_map.get(op), int(value)
+    return None, None
+
 def standardize_date_filter(filter_str):
     filter_str = filter_str.lower().strip()
     months = {
