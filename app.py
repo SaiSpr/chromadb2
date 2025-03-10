@@ -195,12 +195,16 @@ def get_biomarker_response(input_text):
     "Extract only genomic biomarkers while preserving the logical relationships between them. "
     "Remember to treat (AND, and) as equivalent, and (OR, or) as equivalent.\n\n"
     "For instance, if the input is 'BRAF mutation and KRAS mutation', output both biomarkers together in one list; "
-    "if the input is 'BRAF mutation, KRAS mutation', output each biomarker in a separate list.\n\n"
+    "if the input is 'BRAF mutation or KRAS mutation', output each biomarker in a separate list.\n\n"
     "Return a JSON object with the keys \"inclusion_biomarker\" and \"exclusion_biomarker\", where each value is a list of lists. "
     "Always include the \"exclusion_biomarker\" key, even if it is empty.\n\n"
-    "Example:\n"
+    "Example1:\n"
     "Input: 'BRAF mutation and KRAS mutation'\n"
     "Output: { \"inclusion_biomarker\": [[\"BRAF mutation\", \"KRAS mutation\"]], \"exclusion_biomarker\": [] }"
+        
+    "Example2:\n"
+    "Input: 'ALK rearrangement or ROS1 rearrangement'\n"
+    "Output: { \"inclusion_biomarker\": [[\"ALK rearrangement\"], [\"ROS1 rearrangement\"]], \"exclusion_biomarker\": [] }"
     )
 
     
