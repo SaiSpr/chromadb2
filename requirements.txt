@@ -8,3 +8,4 @@ pandas
 numpy
 pysqlite3-binary
 rapidfuzz
+protobuf~=3.19.0
