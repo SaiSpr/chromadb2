@@ -1,7 +1,5 @@
 openai==0.28
-gradio_client
 streamlit
-gradio_client
 chromadb
 sentence-transformers
 pandas
