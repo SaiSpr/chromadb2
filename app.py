@@ -481,10 +481,10 @@ def query_chromadb(parsed_input):
     query_embedding = get_embedding(query_text)
 
     results = collection.query(
-        query_embeddings=[query_embedding.tolist()],
-        n_results=6000,
-        where=demo_filter
-    )
+            query_embeddings=[query_embedding],
+             n_results=6000,
+             where=demo_filter
+         )
     if results and "metadatas" in results and results["metadatas"]:
         df = pd.DataFrame(results["metadatas"][0])
         inclusion_groups = parsed_input.get("inclusion_biomarker", [])
