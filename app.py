@@ -24,7 +24,7 @@ st.markdown(
 import pandas as pd
 import chromadb
 import torch
-from sentence_transformers import SentenceTransformer
+#from sentence_transformers import SentenceTransformer
 import re
 import json
 import os
@@ -32,10 +32,12 @@ from datetime import datetime
 import openai
 from rapidfuzz import fuzz
 
+openai.api_key = os.environ.get("OPENAI_API_KEY")
+
 # -------------------------------
 # Initialize Embedding Model and ChromaDB Collection
 # -------------------------------
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+#embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
 CHROMA_DB_DIR = "."
 client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
 collection = client.get_or_create_collection("clinical_trials")
@@ -455,6 +457,13 @@ def filter_trials_by_eligibility(df, inclusion_keywords, exclusion_keywords, spo
 # -------------------------------
 # Updated Query ChromaDB Function (Using Demographic Filtering and Post-filtering by Eligibility + Sponsor Fuzzy)
 # -------------------------------
+def get_embedding(text: str) -> list[float]:
+    response = openai.Embedding.create(
+        model="text-embedding-ada-002",
+        input=text
+    )
+    return response["data"][0]["embedding"]
+
 def query_chromadb(parsed_input):
     demo_filter = build_metadata_filter(parsed_input)
     query_text = f"""
@@ -468,7 +477,9 @@ def query_chromadb(parsed_input):
     Start Date: {parsed_input.get('start_date', '')}
     Sponsor: {parsed_input.get('sponsor', '')}
     """
-    query_embedding = embedding_model.encode(query_text, convert_to_tensor=False)
+    
+    query_embedding = get_embedding(query_text)
+
     results = collection.query(
         query_embeddings=[query_embedding.tolist()],
         n_results=6000,
