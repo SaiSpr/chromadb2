@@ -1,13 +1,10 @@
-
-
-
 openai==0.28
-streamlit
-chromadb
+streamlit>=1.24
+chromadb==0.4.15
 sentence-transformers==2.2.2
 torch==2.0.1
-pandas
-numpy
+pandas>=1.5
+numpy>=1.22
 pysqlite3-binary
 rapidfuzz
 protobuf~=3.19.0
