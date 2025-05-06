@@ -471,7 +471,7 @@ def get_embedding(text: str) -> list[float]:
     return response["data"][0]["embedding"]
 
 def query_chromadb(parsed_input):
-    # ─── Dummy data generation (150 rows) ───
+    # ─── Dummy data generation ───
     def random_date(start, end):
         return (start + timedelta(days=random.randint(0, (end - start).days))).strftime("%Y-%m-%d")
 
@@ -481,19 +481,96 @@ def query_chromadb(parsed_input):
     sponsors_general = ["NIH","Pfizer","Roche","Novartis","Merck","Amgen","Roswell Park Cancer Institute"]
 
     rows = []
-    # … [your five loops of 30 each as before] …
-    # For brevity, assume rows is filled with 150 dicts as in the last stub.
+    # 1) KRAS + Amgen
+    for _ in range(30):
+        rows.append({ **{
+            "nctId": f"NCT{random.randint(10000000,99999999)}",
+            "condition":"Lung Cancer",
+            "overallStatus":random.choice(statuses),
+            "count":random.randint(10,500),
+            "minAge":random.randint(18,65),
+            "sex":random.choice(["MALE","FEMALE","ALL"]),
+            "startDate":random_date(datetime(2015,1,1), datetime(2025,1,1)),
+            "country":random.choice(countries),
+            "city":random.choice(cities_general),
+            "sponsor":"Amgen",
+            "isFdaRegulatedDrug":random.choice([True,False])
+        }})
+
+    # 2) PD-L1, female, Roswell Park
+    for _ in range(30):
+        rows.append({ **{
+            "nctId": f"NCT{random.randint(10000000,99999999)}",
+            "condition":"Lung Cancer",
+            "overallStatus":random.choice(statuses),
+            "count":random.randint(10,500),
+            "minAge":random.randint(18,65),
+            "sex":"FEMALE",
+            "startDate":random_date(datetime(2015,1,1), datetime(2025,1,1)),
+            "country":random.choice(countries),
+            "city":random.choice(cities_general),
+            "sponsor":"Roswell Park Cancer Institute",
+            "isFdaRegulatedDrug":random.choice([True,False])
+        }})
+
+    # 3) EGFR exclude DDR2, age>30, size>50
+    for _ in range(30):
+        rows.append({ **{
+            "nctId": f"NCT{random.randint(10000000,99999999)}",
+            "condition":"Lung Cancer",
+            "overallStatus":random.choice(statuses),
+            "count":random.randint(51,500),
+            "minAge":random.randint(31,80),
+            "sex":random.choice(["MALE","FEMALE","ALL"]),
+            "startDate":random_date(datetime(2015,1,1), datetime(2025,1,1)),
+            "country":random.choice(countries),
+            "city":random.choice(cities_general),
+            "sponsor":random.choice(sponsors_general),
+            "isFdaRegulatedDrug":random.choice([True,False])
+        }})
+
+    # 4) KRAS or BRAF excl MET amp, Boston
+    for _ in range(30):
+        rows.append({ **{
+            "nctId": f"NCT{random.randint(10000000,99999999)}",
+            "condition":"Lung Cancer",
+            "overallStatus":random.choice(statuses),
+            "count":random.randint(10,500),
+            "minAge":random.randint(18,65),
+            "sex":random.choice(["MALE","FEMALE","ALL"]),
+            "startDate":random_date(datetime(2015,1,1), datetime(2025,1,1)),
+            "country":random.choice(countries),
+            "city":"Boston",
+            "sponsor":random.choice(sponsors_general),
+            "isFdaRegulatedDrug":random.choice([True,False])
+        }})
+
+    # 5) MET ex14 + (HER2 or PIK3CA), size>25, LA, FDA, after 2015
+    for _ in range(30):
+        rows.append({ **{
+            "nctId": f"NCT{random.randint(10000000,99999999)}",
+            "condition":"Lung Cancer",
+            "overallStatus":random.choice(statuses),
+            "count":random.randint(26,500),
+            "minAge":random.randint(18,65),
+            "sex":random.choice(["MALE","FEMALE","ALL"]),
+            "startDate":random_date(datetime(2016,1,1), datetime(2025,1,1)),
+            "country":random.choice(countries),
+            "city":"Los Angeles",
+            "sponsor":random.choice(sponsors_general),
+            "isFdaRegulatedDrug":True
+        }})
 
     df = pd.DataFrame(rows)
 
-    # ─── Now apply filters based on parsed_input ───
+    # ─── Apply each filter only if both the user asked for it AND the column exists ───
 
-    # 1) Status
-    if parsed_input.get("status"):
+    # status
+    if parsed_input.get("status") and "overallStatus" in df.columns:
         df = df[df["overallStatus"] == parsed_input["status"]]
 
-    # 2) Study size (count)
-    if parsed_input.get("study_size"):
+    # study_size
+    if parsed_input.get("study_size") and "count" in df.columns:
         m = re.match(r'(<=|>=|<|>|=)\s*(\d+)', parsed_input["study_size"])
         if m:
             op, val = m.group(1), int(m.group(2))
@@ -506,8 +583,8 @@ def query_chromadb(parsed_input):
             }
             df = df[ops[op]]
 
-    # 3) Ages (minAge)
-    if parsed_input.get("ages"):
+    # ages
+    if parsed_input.get("ages") and "minAge" in df.columns:
         m = re.match(r'(<=|>=|<|>|=)\s*(\d+)', parsed_input["ages"])
         if m:
             op, val = m.group(1), int(m.group(2))
@@ -520,25 +597,25 @@ def query_chromadb(parsed_input):
             }
             df = df[ops[op]]
 
-    # 4) Gender
-    if parsed_input.get("gender"):
+    # gender
+    if parsed_input.get("gender") and "sex" in df.columns:
         df = df[df["sex"] == parsed_input["gender"]]
 
-    # 5) Country
-    if parsed_input.get("country"):
+    # country
+    if parsed_input.get("country") and "country" in df.columns:
         df = df[df["country"] == parsed_input["country"]]
 
-    # 6) City
-    if parsed_input.get("city"):
+    # city
+    if parsed_input.get("city") and "city" in df.columns:
         df = df[df["city"] == parsed_input["city"]]
 
-    # 7) FDA‐drug
-    if parsed_input.get("fda_drug"):
+    # fda_drug
+    if parsed_input.get("fda_drug") and "isFdaRegulatedDrug" in df.columns:
         want = parsed_input["fda_drug"].lower() in ["true","yes","fda approved","1"]
         df = df[df["isFdaRegulatedDrug"] == want]
 
-    # 8) Start date
-    if parsed_input.get("start_date"):
+    # start_date
+    if parsed_input.get("start_date") and "startDate" in df.columns:
         m = re.match(r'(<=|>=|<|>)\s*(\d{4}-\d{2}-\d{2})', parsed_input["start_date"])
         if m:
             op, date_str = m.group(1), m.group(2)
@@ -552,12 +629,9 @@ def query_chromadb(parsed_input):
             elif op == ">=":
                 df = df[dates >= pd.to_datetime(date_str)]
 
-    # 9) Sponsor
-    if parsed_input.get("sponsor"):
+    # sponsor
+    if parsed_input.get("sponsor") and "sponsor" in df.columns:
         df = df[df["sponsor"] == parsed_input["sponsor"]]
-
-    # (Optional) 10) Biomarker filters – stub data doesn’t contain these, 
-    # but here’s where you’d do your inclusion/exclusion keyword checks.
 
     return df
 
