@@ -1,11 +1,14 @@
+
+
+
 openai==0.28
-gradio_client
 streamlit
-gradio_client
 chromadb
-sentence-transformers
+sentence-transformers==2.2.2
+torch==2.0.1
 pandas
 numpy
 pysqlite3-binary
 rapidfuzz
 protobuf~=3.19.0
+
