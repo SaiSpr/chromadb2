@@ -38,9 +38,14 @@ openai.api_key = os.environ.get("OPENAI_API_KEY")
 # Initialize Embedding Model and ChromaDB Collection
 # -------------------------------
 #embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
-CHROMA_DB_DIR = "."
+
+CHROMA_DB_DIR = "./chroma_ada_v1"
 client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
 collection = client.get_or_create_collection("clinical_trials")
+
+# CHROMA_DB_DIR = "."
+# client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+# collection = client.get_or_create_collection("clinical_trials")
 
 # -------------------------------
 # Helper Functions
