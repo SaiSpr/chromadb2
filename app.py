@@ -35,7 +35,7 @@ from rapidfuzz import fuzz
 # -------------------------------
 # Initialize Embedding Model and ChromaDB Collection
 # -------------------------------
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
 CHROMA_DB_DIR = "."
 client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
 collection = client.get_or_create_collection("clinical_trials")
