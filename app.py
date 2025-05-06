@@ -475,91 +475,85 @@ def query_chromadb(parsed_input):
     def random_date(start, end):
         return (start + timedelta(days=random.randint(0, (end - start).days))).strftime("%Y-%m-%d")
 
-    statuses = ["COMPLETED","RECRUITING","WITHDRAWN","ACTIVE_NOT_RECRUITING","NOT_YET_RECRUITING"]
-    countries = ["United States","Canada","United Kingdom","Australia","Germany"]
-    cities_general = ["Boston","Los Angeles","Toronto","London","Sydney","Berlin"]
-    sponsors_general = ["NIH","Pfizer","Roche","Novartis","Merck","Amgen","Roswell Park Cancer Institute"]
+    statuses         = ["COMPLETED", "RECRUITING", "WITHDRAWN", "ACTIVE_NOT_RECRUITING", "NOT_YET_RECRUITING"]
+    countries        = ["United States", "Canada", "United Kingdom", "Australia", "Germany"]
+    cities_general   = ["Boston", "Los Angeles", "Toronto", "London", "Sydney", "Berlin"]
+    sponsors_general = ["NIH", "Pfizer", "Roche", "Novartis", "Merck", "Amgen", 
+                        "Roswell Park Cancer Institute", "GSK", "Bristol-Myers Squibb"]
 
     rows = []
     # 1) KRAS + Amgen
     for _ in range(30):
-        rows.append({ **{
-            "nctId": f"NCT{random.randint(10000000,99999999)}",
-            "condition":"Lung Cancer",
-            "overallStatus":random.choice(statuses),
-            "count":random.randint(10,500),
-            "minAge":random.randint(18,65),
-            "sex":random.choice(["MALE","FEMALE","ALL"]),
-            "startDate":random_date(datetime(2015,1,1), datetime(2025,1,1)),
-            "country":random.choice(countries),
-            "city":random.choice(cities_general),
-            "sponsor":"Amgen",
-            "isFdaRegulatedDrug":random.choice([True,False])
-        }})
+        rows.append({
+            "nctId":               f"NCT{random.randint(10000000,99999999)}",
+            "condition":           "Lung Cancer",
+            "overallStatus":       random.choice(statuses),
+            "count":               random.randint(10, 500),
+            "minAge":              random.randint(18, 65),
+            "sex":                 random.choice(["MALE", "FEMALE", "ALL"]),
+            "startDate":           random_date(datetime(2015,1,1), datetime(2025,1,1)),
+            "country":             random.choice(countries),
+            "city":                random.choice(cities_general),
+            "sponsor":             "Amgen",
+            "isFdaRegulatedDrug":  random.choice([True, False])
+        })
 
     # 2) PD-L1, female, Roswell Park
     for _ in range(30):
-        rows.append({ **{
-            "nctId": f"NCT{random.randint(10000000,99999999)}",
-            "condition":"Lung Cancer",
-            "overallStatus":random.choice(statuses),
-            "count":random.randint(10,500),
-            "minAge":random.randint(18,65),
-            "sex":"FEMALE",
-            "startDate":random_date(datetime(2015,1,1), datetime(2025,1,1)),
-            "country":random.choice(countries),
-            "city":random.choice(cities_general),
-            "sponsor":"Roswell Park Cancer Institute",
-            "isFdaRegulatedDrug":random.choice([True,False])
-        }})
+        rows.append({
+            **rows[-1],  # copy last dict to speed up, then override
+            "nctId":              f"NCT{random.randint(10000000,99999999)}",
+            "sex":                "FEMALE",
+            "sponsor":            "Roswell Park Cancer Institute"
+        })
 
-    # 3) EGFR exclude DDR2, age>30, size>50
+    # 3) EGFR excl DDR2, age>30, size>50
     for _ in range(30):
-        rows.append({ **{
-            "nctId": f"NCT{random.randint(10000000,99999999)}",
-            "condition":"Lung Cancer",
-            "overallStatus":random.choice(statuses),
-            "count":random.randint(51,500),
-            "minAge":random.randint(31,80),
-            "sex":random.choice(["MALE","FEMALE","ALL"]),
-            "startDate":random_date(datetime(2015,1,1), datetime(2025,1,1)),
-            "country":random.choice(countries),
-            "city":random.choice(cities_general),
-            "sponsor":random.choice(sponsors_general),
-            "isFdaRegulatedDrug":random.choice([True,False])
-        }})
+        rows.append({
+            **rows[-1],
+            "nctId":              f"NCT{random.randint(10000000,99999999)}",
+            "count":              random.randint(51, 500),
+            "minAge":             random.randint(31, 80),
+            "sex":                random.choice(["MALE", "FEMALE", "ALL"]),
+            "sponsor":            random.choice(sponsors_general)
+        })
 
     # 4) KRAS or BRAF excl MET amp, Boston
     for _ in range(30):
-        rows.append({ **{
-            "nctId": f"NCT{random.randint(10000000,99999999)}",
-            "condition":"Lung Cancer",
-            "overallStatus":random.choice(statuses),
-            "count":random.randint(10,500),
-            "minAge":random.randint(18,65),
-            "sex":random.choice(["MALE","FEMALE","ALL"]),
-            "startDate":random_date(datetime(2015,1,1), datetime(2025,1,1)),
-            "country":random.choice(countries),
-            "city":"Boston",
-            "sponsor":random.choice(sponsors_general),
-            "isFdaRegulatedDrug":random.choice([True,False])
-        }})
+        rows.append({
+            **rows[-1],
+            "nctId":              f"NCT{random.randint(10000000,99999999)}",
+            "city":               "Boston",
+            "sponsor":            random.choice(sponsors_general)
+        })
 
     # 5) MET ex14 + (HER2 or PIK3CA), size>25, LA, FDA, after 2015
     for _ in range(30):
-        rows.append({ **{
-            "nctId": f"NCT{random.randint(10000000,99999999)}",
-            "condition":"Lung Cancer",
-            "overallStatus":random.choice(statuses),
-            "count":random.randint(26,500),
-            "minAge":random.randint(18,65),
-            "sex":random.choice(["MALE","FEMALE","ALL"]),
-            "startDate":random_date(datetime(2016,1,1), datetime(2025,1,1)),
-            "country":random.choice(countries),
-            "city":"Los Angeles",
-            "sponsor":random.choice(sponsors_general),
-            "isFdaRegulatedDrug":True
-        }})
+        rows.append({
+            **rows[-1],
+            "nctId":              f"NCT{random.randint(10000000,99999999)}",
+            "count":              random.randint(26, 500),
+            "startDate":          random_date(datetime(2016,1,1), datetime(2025,1,1)),
+            "city":               "Los Angeles",
+            "isFdaRegulatedDrug": True,
+            "sponsor":            random.choice(sponsors_general)
+        })
+
+    # 6) **Additional fully random variations** (200 rows)
+    for _ in range(200):
+        rows.append({
+            "nctId":               f"NCT{random.randint(10000000,99999999)}",
+            "condition":           "Lung Cancer",
+            "overallStatus":       random.choice(statuses),
+            "count":               random.randint(5, 600),
+            "minAge":              random.randint(12, 90),
+            "sex":                 random.choice(["MALE", "FEMALE", "ALL"]),
+            "startDate":           random_date(datetime(2010,1,1), datetime(2025,1,1)),
+            "country":             random.choice(countries),
+            "city":                random.choice(cities_general),
+            "sponsor":             random.choice(sponsors_general),
+            "isFdaRegulatedDrug":  random.choice([True, False])
+        })
 
     df = pd.DataFrame(rows)
 
