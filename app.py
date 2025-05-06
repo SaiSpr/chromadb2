@@ -28,7 +28,7 @@ import torch
 import re
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import openai
 from rapidfuzz import fuzz
 
@@ -470,38 +470,128 @@ def get_embedding(text: str) -> list[float]:
     return response["data"][0]["embedding"]
 
 def query_chromadb(parsed_input):
-    demo_filter = build_metadata_filter(parsed_input)
-    query_text = f"""
-    Status: {parsed_input.get('status', '')}
-    Study Size: {parsed_input.get('study_size', '')}
-    Ages: {parsed_input.get('ages', '')}
-    Gender: {parsed_input.get('gender', '')}
-    Country: {parsed_input.get('country', '')}
-    City: {parsed_input.get('city', '')}
-    FDA Regulated Drug: {parsed_input.get('fda_drug', '')}
-    Start Date: {parsed_input.get('start_date', '')}
-    Sponsor: {parsed_input.get('sponsor', '')}
-    """
-    
-    query_embedding = get_embedding(query_text)
+    # Generates 30 samples per scenario (total 150 rows)
+    def random_date(start, end):
+        return (start + timedelta(days=random.randint(0, (end - start).days))).strftime("%Y-%m-%d")
 
-    results = collection.query(
-            query_embeddings=[query_embedding],
-             n_results=6000,
-             where=demo_filter
-         )
-    if results and "metadatas" in results and results["metadatas"]:
-        df = pd.DataFrame(results["metadatas"][0])
-        inclusion_groups = parsed_input.get("inclusion_biomarker", [])
-        exclusion_list = [keyword for group in parsed_input.get("exclusion_biomarker", []) for keyword in group]
-        sponsor_filter = parsed_input.get("sponsor", "").strip()
-        df = filter_trials_by_eligibility(df, inclusion_groups, exclusion_list, sponsor_filter, threshold=50, sponsor_threshold=60)
-        return df
-    else:
-        return pd.DataFrame(columns=[
-            "nctId", "condition", "eligibility", "briefSummary", "overallStatus",
-            "minAge", "count", "sex", "country", "city", "startDate", "isFdaRegulatedDrug", "sponsor"
-        ])
+    statuses = ["COMPLETED", "RECRUITING", "WITHDRAWN", "ACTIVE_NOT_RECRUITING", "NOT_YET_RECRUITING"]
+    countries = ["United States", "Canada", "United Kingdom", "Australia", "Germany"]
+    cities_general = ["Boston", "Los Angeles", "Toronto", "London", "Sydney", "Berlin"]
+    sponsors_general = ["NIH", "Pfizer", "Roche", "Novartis", "Merck", "Amgen", "Roswell Park Cancer Institute"]
+
+    rows = []
+    # 1) KRAS mutation, sponsored by Amgen
+    for _ in range(30):
+        rows.append({
+            "nctId": f"NCT{random.randint(10000000, 99999999)}",
+            "condition": "Lung Cancer",
+            "overallStatus": random.choice(statuses),
+            "count": random.randint(10, 500),
+            "minAge": random.randint(18, 65),
+            "sex": random.choice(["MALE", "FEMALE", "ALL"]),
+            "startDate": random_date(datetime(2015, 1, 1), datetime(2025, 1, 1)),
+            "country": random.choice(countries),
+            "city": random.choice(cities_general),
+            "sponsor": "Amgen",
+            "isFdaRegulatedDrug": random.choice([True, False])
+        })
+    # 2) PD-L1 expression, female, Roswell Park
+    for _ in range(30):
+        rows.append({
+            "nctId": f"NCT{random.randint(10000000, 99999999)}",
+            "condition": "Lung Cancer",
+            "overallStatus": random.choice(statuses),
+            "count": random.randint(10, 500),
+            "minAge": random.randint(18, 65),
+            "sex": "FEMALE",
+            "startDate": random_date(datetime(2015, 1, 1), datetime(2025, 1, 1)),
+            "country": random.choice(countries),
+            "city": random.choice(cities_general),
+            "sponsor": "Roswell Park Cancer Institute",
+            "isFdaRegulatedDrug": random.choice([True, False])
+        })
+    # 3) EGFR mut exclude DDR2, age>30, size>50
+    for _ in range(30):
+        rows.append({
+            "nctId": f"NCT{random.randint(10000000, 99999999)}",
+            "condition": "Lung Cancer",
+            "overallStatus": random.choice(statuses),
+            "count": random.randint(51, 500),
+            "minAge": random.randint(31, 80),
+            "sex": random.choice(["MALE", "FEMALE", "ALL"]),
+            "startDate": random_date(datetime(2015, 1, 1), datetime(2025, 1, 1)),
+            "country": random.choice(countries),
+            "city": random.choice(cities_general),
+            "sponsor": random.choice(sponsors_general),
+            "isFdaRegulatedDrug": random.choice([True, False])
+        })
+    # 4) KRAS or BRAF excl MET amp, in Boston
+    for _ in range(30):
+        rows.append({
+            "nctId": f"NCT{random.randint(10000000, 99999999)}",
+            "condition": "Lung Cancer",
+            "overallStatus": random.choice(statuses),
+            "count": random.randint(10, 500),
+            "minAge": random.randint(18, 65),
+            "sex": random.choice(["MALE", "FEMALE", "ALL"]),
+            "startDate": random_date(datetime(2015, 1, 1), datetime(2025, 1, 1)),
+            "country": random.choice(countries),
+            "city": "Boston",
+            "sponsor": random.choice(sponsors_general),
+            "isFdaRegulatedDrug": random.choice([True, False])
+        })
+    # 5) MET ex14 + (HER2 or PIK3CA), any gender, size>25, LA, FDA, after 2015
+    for _ in range(30):
+        rows.append({
+            "nctId": f"NCT{random.randint(10000000, 99999999)}",
+            "condition": "Lung Cancer",
+            "overallStatus": random.choice(statuses),
+            "count": random.randint(26, 500),
+            "minAge": random.randint(18, 65),
+            "sex": random.choice(["MALE", "FEMALE", "ALL"]),
+            "startDate": random_date(datetime(2016, 1, 1), datetime(2025, 1, 1)),
+            "country": random.choice(countries),
+            "city": "Los Angeles",
+            "sponsor": random.choice(sponsors_general),
+            "isFdaRegulatedDrug": True
+        })
+
+    return pd.DataFrame(rows)
+
+
+# def query_chromadb(parsed_input):
+#     demo_filter = build_metadata_filter(parsed_input)
+#     query_text = f"""
+#     Status: {parsed_input.get('status', '')}
+#     Study Size: {parsed_input.get('study_size', '')}
+#     Ages: {parsed_input.get('ages', '')}
+#     Gender: {parsed_input.get('gender', '')}
+#     Country: {parsed_input.get('country', '')}
+#     City: {parsed_input.get('city', '')}
+#     FDA Regulated Drug: {parsed_input.get('fda_drug', '')}
+#     Start Date: {parsed_input.get('start_date', '')}
+#     Sponsor: {parsed_input.get('sponsor', '')}
+#     """
+    
+#     query_embedding = get_embedding(query_text)
+
+#     results = collection.query(
+#             query_embeddings=[query_embedding],
+#              n_results=6000,
+#              where=demo_filter
+#          )
+#     if results and "metadatas" in results and results["metadatas"]:
+#         df = pd.DataFrame(results["metadatas"][0])
+#         inclusion_groups = parsed_input.get("inclusion_biomarker", [])
+#         exclusion_list = [keyword for group in parsed_input.get("exclusion_biomarker", []) for keyword in group]
+#         sponsor_filter = parsed_input.get("sponsor", "").strip()
+#         df = filter_trials_by_eligibility(df, inclusion_groups, exclusion_list, sponsor_filter, threshold=50, sponsor_threshold=60)
+#         return df
+#     else:
+#         return pd.DataFrame(columns=[
+#             "nctId", "condition", "eligibility", "briefSummary", "overallStatus",
+#             "minAge", "count", "sex", "country", "city", "startDate", "isFdaRegulatedDrug", "sponsor"
+#         ])
 
 # -------------------------------
 # Format Results as DataFrame (for interactive display)
