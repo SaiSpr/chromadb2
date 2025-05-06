@@ -21,6 +21,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+import random
 import pandas as pd
 import chromadb
 import torch
